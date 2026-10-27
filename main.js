@@ -13,9 +13,7 @@
 
   const canvas = document.getElementById('strings');
   const ctx2d = canvas.getContext('2d');
-  const playBtn = document.getElementById('game');
-  const hint = document.querySelector('.hint');
-  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+  const playBtn = document.getElementById('game');  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
   const darkScheme = window.matchMedia('(prefers-color-scheme: dark)');
 
   const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
@@ -73,8 +71,7 @@
         bank[i] = [makeString(s.freq), makeString(s.freq), makeString(s.freq)];
       });
     }
-    if (audio.state === 'suspended') audio.resume().then(() => hint.classList.remove('locked'));
-    else hint.classList.remove('locked');
+    if (audio.state === 'suspended') audio.resume();
   }
 
   // Any first click, tap or key press anywhere on the page unlocks the sound.
@@ -343,10 +340,7 @@
         const f = (ys[i] - last.y) / dy;
         const x = (last.x + (p.x - last.x) * f) / W;
         pluck(i, { x, vel, delay: k * 0.012, touch: e.pointerType === 'touch' });
-      });
-      // Strumming before the browser allows sound: say how to turn it on.
-      if (crossed.length && (!audio || audio.state !== 'running')) hint.classList.add('locked');
-    }
+      });    }
     last = p;
   });
 

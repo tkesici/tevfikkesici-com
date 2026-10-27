@@ -116,11 +116,7 @@ canvas:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
   color: var(--muted);
 }
 .hint { margin: 0; font-family: var(--serif); font-style: italic; font-size: 1rem; }
-.hint .coarse,
-.hint .mute { display: none; }
-.hint.locked .fine,
-.hint.locked .coarse { display: none; }
-.hint.locked .mute { display: inline; color: var(--ink); }
+.hint .coarse { display: none; }
 @media (pointer: coarse) {
   .hint .fine { display: none; }
   .hint .coarse { display: inline; }
