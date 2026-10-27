@@ -30,7 +30,12 @@ html {
   user-select: none;
   -webkit-touch-callout: none;
   -webkit-tap-highlight-color: transparent;
+  /* The pick is the cursor everywhere, so reaching the strings feels like playing. */
+  cursor: url("pick.svg?v=14") 9 26, auto;
 }
+a,
+button,
+button:disabled { cursor: url("pick.svg?v=14") 9 26, pointer; }
 
 body {
   margin: 0;
@@ -126,11 +131,9 @@ canvas:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
   background: none;
   border: 0;
   padding: 0;
-  cursor: pointer;
 }
 .game .label { border-bottom: 1px solid currentColor; }
 .game button:hover { color: var(--accent); }
-.game button:disabled { cursor: default; }
 .game button:disabled .label { color: var(--muted); border-bottom-style: dotted; }
 
 /* the little busker above the button */
@@ -142,7 +145,7 @@ canvas:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .busker .note { transform-box: view-box; }
 .busker .strum { transform-origin: 24.6px 22.6px; animation: strum 1s ease-in-out infinite; }
 .busker .head { transform-origin: 30px 21px; animation: bob 2s ease-in-out infinite; }
-.busker .foot { transform-origin: 34px 51.5px; animation: tap 1s ease-in-out infinite; }
+.busker .foot { transform-origin: 19px 55.8px; animation: tap 1s ease-in-out infinite; }
 .busker .note { opacity: 0; animation: float 4s ease-out infinite; }
 .busker .n2 { animation-delay: 2s; }
 .playing .busker .strum { animation-duration: .34s; }
@@ -177,7 +180,7 @@ canvas {
   width: 100%;
   height: 100%;
   touch-action: none;
-  cursor: url("pick.svg?v=8") 9 26, pointer;
+  cursor: inherit;
   -webkit-tap-highlight-color: transparent;
 }
 
