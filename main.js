@@ -90,9 +90,16 @@
     src.buffer = variants[(Math.random() * variants.length) | 0];
     const rate = Math.pow(2, (fret || 0) / 12) * (1 + (Math.random() - 0.5) * 0.002);
     src.playbackRate.value = rate;
+    // Picked near the ends a string sounds thin and bright, in the middle soft and round.
+    const warmth = clamp((Math.min(pan, 1 - pan) - 0.08) / 0.42, 0, 1);
+    const tone = audio.createBiquadFilter();
+    tone.type = 'lowpass';
+    tone.frequency.value = 9000 * Math.pow(1400 / 9000, warmth);
+    tone.Q.value = 0.6;
     const gain = audio.createGain();
-    gain.gain.value = 0.25 + vel * 0.6;
-    src.connect(gain);
+    gain.gain.value = (0.25 + vel * 0.6) * (1 + warmth * 0.3);
+    src.connect(tone);
+    tone.connect(gain);
     if (audio.createStereoPanner) {
       const p = audio.createStereoPanner();
       p.pan.value = (pan - 0.5) * 0.8;
@@ -232,6 +239,16 @@
     s.glow = opts.glow ? 1 : 0;
     kick();
     ring(i, vel, s.px, opts.delay, opts.fret);
+    if (opts.touch) buzz();
+  }
+
+  // A tiny tick under the finger on phones that support it.
+  let lastBuzz = 0;
+  function buzz() {
+    const now = performance.now();
+    if (!navigator.vibrate || now - lastBuzz < 30) return;
+    lastBuzz = now;
+    try { navigator.vibrate(8); } catch (e) { /* not allowed yet */ }
   }
 
   function nearest(y) {
@@ -286,7 +303,7 @@
     const p = point(e);
     last = p;
     const i = nearest(p.y);
-    if (i >= 0) pluck(i, { x: p.x / W, vel: 0.8 });
+    if (i >= 0) pluck(i, { x: p.x / W, vel: 0.8, touch: e.pointerType === 'touch' });
     if (i >= 0 && Math.abs(ys[i] - p.y) <= gap * 0.35) {
       bend = { i, x: p.x, y: p.y, id: e.pointerId, active: false, timer: 0 };
       // On touch a short hold starts the bend, so a quick swipe still strums.
@@ -318,7 +335,7 @@
       crossed.forEach((i, k) => {
         const f = (ys[i] - last.y) / dy;
         const x = (last.x + (p.x - last.x) * f) / W;
-        pluck(i, { x, vel, delay: k * 0.012 });
+        pluck(i, { x, vel, delay: k * 0.012, touch: e.pointerType === 'touch' });
       });
     }
     last = p;
@@ -435,7 +452,7 @@
         const i = noteFor(shape, role);
         if (i < 0) return;
         const vel = k === 0 ? 0.8 : 0.5 + Math.random() * 0.15;
-        later(() => pluck(i, { x: 0.5, vel, glow: true, force: true, fret: shape[i] }), t);
+        later(() => pluck(i, { x: 0.3, vel, glow: true, force: true, fret: shape[i] }), t);
         t += song.step;
       });
       c++;
