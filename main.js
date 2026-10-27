@@ -14,7 +14,6 @@
   const canvas = document.getElementById('strings');
   const ctx2d = canvas.getContext('2d');
   const playBtn = document.getElementById('game');
-  const statusEl = document.getElementById('status');
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
   const darkScheme = window.matchMedia('(prefers-color-scheme: dark)');
 
@@ -121,7 +120,7 @@
   let ys = [];
   let gap = 0;
   let raf = 0;
-  const colors = { ink: '#1d1b18', accent: '#c2410c', bg: '#f2ede3' };
+  const colors = { ink: '#121212', accent: '#000', bg: '#f4f4f2' };
   const strings = STRINGS.map(() => ({ amp: 0, t0: 0, px: 0.5, glow: 0, hold: 0, holdX: 0.5 }));
   let bend = null;
 
@@ -266,6 +265,7 @@
     const reach = gap * 0.9;
     const dy = clamp(p.y - bend.y, -reach, reach);
     strings[bend.i].hold = dy;
+    strings[bend.i].holdX = clamp(p.x / W, 0.04, 0.96);
     bendPitch(bend.i, (MAX_BEND * Math.abs(dy)) / reach, 0.012);
     kick();
   }
@@ -426,7 +426,6 @@
     const pattern = PATTERNS[song.pattern];
 
     playBtn.disabled = true;
-    statusEl.textContent = song.chords.join(' · ');
 
     let t = 300;
     let c = 0;
@@ -452,7 +451,6 @@
     later(() => {
       playBtn.disabled = false;
       playBtn.textContent = 'Play me something else';
-      statusEl.textContent = '';
     }, t + 1600);
   }
 

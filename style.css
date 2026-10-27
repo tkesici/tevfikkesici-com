@@ -1,9 +1,9 @@
 :root {
-  --bg: #f2ede3;
-  --ink: #1d1b18;
-  --muted: #776f62;
-  --rule: #d9d0bf;
-  --accent: #c2410c;
+  --bg: #f4f4f2;
+  --ink: #121212;
+  --muted: #6e6e6e;
+  --rule: #d6d6d3;
+  --accent: #000;
   --pad: clamp(20px, 4.5vw, 56px);
   --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
   --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -11,11 +11,11 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #151411;
-    --ink: #ebe4d6;
-    --muted: #91887a;
-    --rule: #2f2c26;
-    --accent: #f0773a;
+    --bg: #0d0d0d;
+    --ink: #e9e9e7;
+    --muted: #8a8a88;
+    --rule: #2a2a2a;
+    --accent: #fff;
   }
 }
 
@@ -33,7 +33,7 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-::selection { background: var(--accent); color: var(--bg); }
+::selection { background: var(--ink); color: var(--bg); }
 
 .page {
   position: relative;
@@ -128,7 +128,6 @@ canvas:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 }
 .game button:hover { color: var(--accent); }
 .game button:disabled { color: var(--muted); cursor: default; border-bottom-style: dotted; }
-.status { color: var(--ink); min-height: 1em; }
 
 .stage {
   position: relative;
@@ -142,7 +141,7 @@ canvas {
   width: 100%;
   height: 100%;
   touch-action: none;
-  cursor: url("pick.svg?v=5") 9 26, pointer;
+  cursor: url("pick.svg?v=6") 9 26, pointer;
   -webkit-tap-highlight-color: transparent;
 }
 
