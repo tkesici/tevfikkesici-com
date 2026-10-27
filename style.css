@@ -108,18 +108,12 @@ canvas:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .play-head {
   display: flex;
   flex-wrap: wrap;
-  justify-content: space-between;
+  justify-content: flex-end;
   align-items: baseline;
   gap: .5rem 1.5rem;
   padding: 0 var(--pad);
   font-size: .9rem;
   color: var(--muted);
-}
-.hint { margin: 0; font-family: var(--serif); font-style: italic; font-size: 1rem; }
-.hint .coarse { display: none; }
-@media (pointer: coarse) {
-  .hint .fine { display: none; }
-  .hint .coarse { display: inline; }
 }
 
 .game { display: flex; align-items: baseline; gap: .9rem; flex-wrap: wrap; }

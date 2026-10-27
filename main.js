@@ -57,10 +57,11 @@
   }
 
   // Browsers only allow audio after a click, tap or key press.
+  // That first press is also what tunes the slack strings up.
   function wake() {
     if (!audio) {
       const AC = window.AudioContext || window.webkitAudioContext;
-      if (!AC) return;
+      if (!AC) return tuneUp();
       audio = new AC();
       master = audio.createGain();
       master.gain.value = 0.45;
@@ -71,7 +72,8 @@
         bank[i] = [makeString(s.freq), makeString(s.freq), makeString(s.freq)];
       });
     }
-    if (audio.state === 'suspended') audio.resume();
+    const ready = audio.state === 'suspended' ? audio.resume() : Promise.resolve();
+    return ready.then(tuneUp, tuneUp);
   }
 
   // Any first click, tap or key press anywhere on the page unlocks the sound.
@@ -132,8 +134,54 @@
   let gap = 0;
   let raf = 0;
   const colors = { ink: '#121212', accent: '#000', bg: '#f4f4f2' };
-  const strings = STRINGS.map(() => ({ amp: 0, t0: 0, px: 0.5, glow: 0, hold: 0, holdX: 0.5 }));
+  // The page opens on an untuned guitar: every string hangs a little slack.
+  const strings = STRINGS.map((_, i) => ({
+    amp: 0, t0: 0, px: 0.5, glow: 0, hold: 0, holdX: 0.5,
+    sag: reduceMotion.matches ? 6 : 13 + i * 2.4 + (i % 2) * 3, sag0: 0, tuneT0: 0,
+  }));
   let bend = null;
+  let tuned = false;
+  let tuning = null;
+
+  // Tighten the strings one by one, each sliding up into pitch like a turning peg.
+  function tuneUp() {
+    if (tuning) return tuning;
+    tuning = new Promise((done) => {
+      STRINGS.forEach((_, i) => {
+        setTimeout(() => {
+          const s = strings[i];
+          const now = performance.now();
+          s.sag0 = s.sag;
+          s.tuneT0 = now;
+          s.amp = 3;
+          s.t0 = now;
+          s.px = 0.5;
+          ring(i, 0.55, 0.5, 0, -5);
+          bendPitch(i, 5, 0.09);
+          kick();
+        }, i * 150);
+      });
+      setTimeout(() => { tuned = true; done(); }, STRINGS.length * 150 + 300);
+    });
+    return tuning;
+  }
+
+  function easeOutBack(p) {
+    const c = 1.70158;
+    return 1 + (c + 1) * Math.pow(p - 1, 3) + c * Math.pow(p - 1, 2);
+  }
+
+  function sagOf(s, i, now) {
+    if (s.tuneT0) {
+      const p = (now - s.tuneT0) / 420;
+      if (p < 1) return s.sag0 * (1 - easeOutBack(p));
+      s.sag = 0;
+      s.tuneT0 = 0;
+      return 0;
+    }
+    // Slack strings sway a little, so the page looks alive before anyone touches it.
+    return s.sag ? s.sag * (1 + 0.06 * Math.sin(now / 850 + i * 1.3)) : 0;
+  }
 
   function readColors() {
     const cs = getComputedStyle(document.documentElement);
@@ -162,13 +210,13 @@
     return x < p ? x / p : (W - x) / (W - p);
   }
 
-  function strokeString(i, a, osc) {
+  function strokeString(i, a, osc, sag) {
     const s = strings[i];
     ctx2d.beginPath();
     const steps = 64;
     for (let k = 0; k <= steps; k++) {
       const x = (k / steps) * W;
-      const y = ys[i] + s.hold * tri(x, s.holdX) + a * tri(x, s.px) * osc;
+      const y = ys[i] + sag * Math.sin((Math.PI * x) / W) + s.hold * tri(x, s.holdX) + a * tri(x, s.px) * osc;
       if (k) ctx2d.lineTo(x, y); else ctx2d.moveTo(x, y);
     }
   }
@@ -192,7 +240,10 @@
         if (Math.abs(s.hold) < 0.3) s.hold = 0; else busy = true;
       }
 
-      strokeString(i, a, osc);
+      const sag = sagOf(s, i, now);
+      if (sag || s.tuneT0) busy = true;
+
+      strokeString(i, a, osc, sag);
       ctx2d.lineWidth = STRINGS[i].width;
       ctx2d.lineCap = 'round';
       ctx2d.globalAlpha = 0.88;
@@ -232,6 +283,8 @@
   const lastPluck = STRINGS.map(() => 0);
 
   function pluck(i, opts) {
+    // Hands off while the strings are being tuned.
+    if (tuning && !tuned) return;
     const now = performance.now();
     if (now - lastPluck[i] < 45 && !opts.force) return;
     lastPluck[i] = now;
@@ -478,8 +531,9 @@
   }
 
   playBtn.addEventListener('click', () => {
-    wake();
-    playSomething();
+    // On the very first press, let the strings finish tuning before playing.
+    playBtn.disabled = true;
+    Promise.resolve(wake()).then(playSomething);
   });
 
   /* ---------- boot ---------- */
@@ -490,11 +544,5 @@
   else window.addEventListener('resize', resize);
   const onScheme = () => { readColors(); draw(performance.now()); };
   if (darkScheme.addEventListener) darkScheme.addEventListener('change', onScheme);
-
-  // A quiet hello so people notice the strings are alive.
-  setTimeout(() => {
-    [0, 1, 2, 3, 4, 5].forEach((i) => {
-      setTimeout(() => pluck(i, { x: 0.3, vel: 0.35 }), i * 70);
-    });
-  }, 900);
+  kick();
 })();
