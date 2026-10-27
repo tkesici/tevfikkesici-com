@@ -23,7 +23,14 @@
 *::before,
 *::after { box-sizing: border-box; }
 
-html { -webkit-text-size-adjust: 100%; }
+html {
+  -webkit-text-size-adjust: 100%;
+  /* Nothing here is worth copying; selection only gets in the way of playing. */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
 
 body {
   margin: 0;
@@ -33,7 +40,6 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-::selection { background: var(--ink); color: var(--bg); }
 
 .page {
   position: relative;
@@ -141,7 +147,7 @@ canvas {
   width: 100%;
   height: 100%;
   touch-action: none;
-  cursor: url("pick.svg?v=7") 9 26, pointer;
+  cursor: url("pick.svg?v=8") 9 26, pointer;
   -webkit-tap-highlight-color: transparent;
 }
 

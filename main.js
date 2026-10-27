@@ -344,6 +344,9 @@
   const forget = () => { last = null; };
   canvas.addEventListener('pointerleave', forget);
   canvas.addEventListener('pointercancel', () => { endBend(); forget(); });
+  // A long press is a bend, not a request for the browser's menu.
+  canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+  document.addEventListener('selectstart', (e) => e.preventDefault());
   canvas.addEventListener('lostpointercapture', endBend);
   canvas.addEventListener('pointerup', (e) => {
     endBend();
