@@ -13,10 +13,8 @@
 
   const canvas = document.getElementById('strings');
   const ctx2d = canvas.getContext('2d');
-  const soundBtn = document.getElementById('sound');
-  const gameBtn = document.getElementById('game');
+  const playBtn = document.getElementById('game');
   const statusEl = document.getElementById('status');
-  const bestEl = document.getElementById('best');
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
   const darkScheme = window.matchMedia('(prefers-color-scheme: dark)');
 
@@ -26,8 +24,6 @@
 
   let audio = null;
   let master = null;
-  let soundOn = false;
-  let userMuted = false;
   const bank = [];
   const voices = [];
 
@@ -62,7 +58,8 @@
     return buf;
   }
 
-  function enableSound() {
+  // Browsers only allow audio after a click, tap or key press.
+  function wake() {
     if (!audio) {
       const AC = window.AudioContext || window.webkitAudioContext;
       if (!AC) return;
@@ -77,28 +74,10 @@
       });
     }
     if (audio.state === 'suspended') audio.resume();
-    soundOn = true;
-    renderSoundBtn();
   }
 
-  function disableSound() {
-    soundOn = false;
-    if (audio) audio.suspend();
-    renderSoundBtn();
-  }
-
-  function renderSoundBtn() {
-    soundBtn.textContent = soundOn ? 'sound on' : 'sound off';
-    soundBtn.setAttribute('aria-pressed', String(soundOn));
-  }
-
-  // Any real gesture can turn sound on, unless the visitor switched it off.
-  function wake() {
-    if (!userMuted && !soundOn) enableSound();
-  }
-
-  function ring(i, vel, pan, delay) {
-    if (!soundOn || !audio) return;
+  function ring(i, vel, pan, delay, fret) {
+    if (!audio || audio.state !== 'running') return;
     const t = audio.currentTime + (delay || 0);
     const old = voices[i];
     if (old) {
@@ -110,7 +89,7 @@
     const src = audio.createBufferSource();
     const variants = bank[i];
     src.buffer = variants[(Math.random() * variants.length) | 0];
-    src.playbackRate.value = 1 + (Math.random() - 0.5) * 0.002;
+    src.playbackRate.value = Math.pow(2, (fret || 0) / 12) * (1 + (Math.random() - 0.5) * 0.002);
     const gain = audio.createGain();
     gain.gain.value = 0.25 + vel * 0.6;
     src.connect(gain);
@@ -127,17 +106,6 @@
     voices[i] = voice;
     src.onended = () => { if (voices[i] === voice) voices[i] = null; };
   }
-
-  soundBtn.addEventListener('click', () => {
-    if (soundOn) {
-      userMuted = true;
-      disableSound();
-    } else {
-      userMuted = false;
-      enableSound();
-      pluck(5, { x: 0.5, vel: 0.5 });
-    }
-  });
 
   /* ---------- drawing ---------- */
 
@@ -245,7 +213,7 @@
     s.px = clamp(opts.x == null ? 0.5 : opts.x, 0.08, 0.92);
     s.glow = opts.glow ? 1 : 0;
     kick();
-    ring(i, vel, s.px, opts.delay);
+    ring(i, vel, s.px, opts.delay, opts.fret);
   }
 
   function nearest(y) {
@@ -256,18 +224,6 @@
       if (d < dist) { dist = d; best = i; }
     });
     return dist <= gap * 0.6 ? best : -1;
-  }
-
-  // Returns false when the visitor's pluck should be ignored.
-  function userPluck(i, x, vel, isTap, delay) {
-    if (game.state === 'listening' || game.state === 'between') return;
-    if (game.state === 'yours') {
-      if (!isTap) return;
-      pluck(i, { x, vel, glow: true });
-      check(i);
-      return;
-    }
-    pluck(i, { x, vel, delay });
   }
 
   let last = null;
@@ -282,7 +238,7 @@
     const p = point(e);
     last = p;
     const i = nearest(p.y);
-    if (i >= 0) userPluck(i, p.x / W, 0.8, true);
+    if (i >= 0) pluck(i, { x: p.x / W, vel: 0.8 });
     if (e.pointerType !== 'mouse' && canvas.setPointerCapture) {
       canvas.setPointerCapture(e.pointerId);
     }
@@ -302,7 +258,7 @@
       crossed.forEach((i, k) => {
         const f = (ys[i] - last.y) / dy;
         const x = (last.x + (p.x - last.x) * f) / W;
-        userPluck(i, x, vel, false, k * 0.012);
+        pluck(i, { x, vel, delay: k * 0.012 });
       });
     }
     last = p;
@@ -318,100 +274,132 @@
     const n = Number(e.key);
     if (n >= 1 && n <= 6) {
       wake();
-      userPluck(n - 1, 0.5, 0.7, true);
+      pluck(n - 1, { x: 0.5, vel: 0.7 });
     }
   });
 
-  /* ---------- the little game: hear it, play it back ---------- */
+  /* ---------- play me something ---------- */
 
-  const game = { state: 'idle', seq: [], pos: 0, best: loadBest(), timers: [] };
+  // Frets per string, low E to high e; -1 means the string isn't played.
+  const CHORDS = {
+    C: [-1, 3, 2, 0, 1, 0],
+    Cmaj7: [-1, 3, 2, 0, 0, 0],
+    Cadd9: [-1, 3, 2, 0, 3, 0],
+    D: [-1, -1, 0, 2, 3, 2],
+    Dsus2: [-1, -1, 0, 2, 3, 0],
+    Dm: [-1, -1, 0, 2, 3, 1],
+    Dm7: [-1, -1, 0, 2, 1, 1],
+    E: [0, 2, 2, 1, 0, 0],
+    E7: [0, 2, 0, 1, 0, 0],
+    Em: [0, 2, 2, 0, 0, 0],
+    Em7: [0, 2, 0, 0, 0, 0],
+    F: [-1, -1, 3, 2, 1, 1],
+    Fmaj7: [-1, -1, 3, 2, 1, 0],
+    G: [3, 2, 0, 0, 0, 3],
+    G7: [3, 2, 0, 0, 0, 1],
+    A: [-1, 0, 2, 2, 2, 0],
+    Asus2: [-1, 0, 2, 2, 0, 0],
+    Am: [-1, 0, 2, 2, 1, 0],
+    Am7: [-1, 0, 2, 0, 1, 0],
+    Bm: [-1, 2, 4, 4, 3, 2],
+  };
 
-  function loadBest() {
-    try { return Number(localStorage.getItem('tk-best')) || 0; } catch (e) { return 0; }
-  }
+  // 'b' is the chord's lowest string; numbers are string indexes (0 = low E).
+  const PATTERNS = [
+    ['b', 3, 4, 5, 4, 3],
+    ['b', 3, 4, 3, 5, 3, 4, 3],
+    ['b', 2, 3, 4, 5, 4, 3, 2],
+    ['b', 4, 3, 5, 3, 4, 3, 5],
+    ['b', 3, 5, 3, 4, 3, 5, 3],
+    ['b', 2, 3, 4, 5, 3, 4, 2],
+  ];
 
-  function saveBest(n) {
-    game.best = n;
-    try { localStorage.setItem('tk-best', String(n)); } catch (e) { /* private mode */ }
-    renderBest();
-  }
+  const SONGS = [
+    { chords: ['Am', 'F', 'C', 'G'], pattern: 0, step: 190 },
+    { chords: ['C', 'G', 'Am', 'F'], pattern: 1, step: 170 },
+    { chords: ['Em', 'C', 'G', 'D'], pattern: 2, step: 160 },
+    { chords: ['Am', 'Dm', 'E', 'Am'], pattern: 0, step: 200 },
+    { chords: ['Cmaj7', 'Fmaj7'], pattern: 3, step: 210 },
+    { chords: ['G', 'Em', 'C', 'D'], pattern: 1, step: 160 },
+    { chords: ['Dm', 'Am', 'E7', 'Am'], pattern: 4, step: 180 },
+    { chords: ['Am7', 'Dm7', 'G7', 'Cmaj7'], pattern: 2, step: 170 },
+    { chords: ['Em', 'Em7', 'Cadd9', 'Dsus2'], pattern: 5, step: 165 },
+    { chords: ['D', 'A', 'Bm', 'G'], pattern: 1, step: 170 },
+    { chords: ['A', 'Asus2', 'D', 'Dsus2'], pattern: 0, step: 190 },
+    { chords: ['Am', 'G', 'F', 'E'], pattern: 3, step: 175 },
+    { chords: ['C', 'Am', 'Dm', 'G7'], pattern: 0, step: 185 },
+    { chords: ['Em', 'Bm', 'C', 'G'], pattern: 2, step: 165 },
+    { chords: ['Fmaj7', 'Em7', 'Dm7', 'Cmaj7'], pattern: 4, step: 190 },
+    { chords: ['E', 'A', 'E', 'D'], pattern: 1, step: 160 },
+    { chords: ['Cadd9', 'G', 'Em7', 'Dsus2'], pattern: 5, step: 170 },
+    { chords: ['Am', 'C', 'D', 'F'], pattern: 0, step: 180 },
+    { chords: ['G', 'D', 'Em', 'C'], pattern: 3, step: 165 },
+    { chords: ['Bm', 'G', 'D', 'A'], pattern: 4, step: 175 },
+  ];
 
-  function renderBest() {
-    bestEl.textContent = game.best ? 'best: ' + game.best : '';
-  }
+  const LENGTH = 10000;
+  let lastSong = -1;
+  let timers = [];
 
   function later(fn, ms) {
-    game.timers.push(setTimeout(fn, ms));
+    timers.push(setTimeout(fn, ms));
   }
 
-  function randomString() {
-    const seq = game.seq;
+  function noteFor(shape, role) {
+    let i = role === 'b' ? shape.findIndex((f) => f >= 0) : role;
+    while (i < 6 && shape[i] < 0) i++;
+    return i < 6 ? i : -1;
+  }
+
+  function playSomething() {
+    timers.forEach(clearTimeout);
+    timers = [];
+
     let n;
-    do {
-      n = (Math.random() * STRINGS.length) | 0;
-    } while (seq.length >= 2 && n === seq[seq.length - 1] && n === seq[seq.length - 2]);
-    return n;
-  }
+    do { n = (Math.random() * SONGS.length) | 0; } while (n === lastSong);
+    lastSong = n;
+    const song = SONGS[n];
+    const pattern = PATTERNS[song.pattern];
 
-  function startGame() {
-    game.timers.forEach(clearTimeout);
-    game.timers = [];
-    game.seq = [];
-    for (let k = 0; k < 3; k++) game.seq.push(randomString());
-    listen();
-  }
+    playBtn.disabled = true;
+    statusEl.textContent = song.chords.join(' · ');
 
-  function listen() {
-    const len = game.seq.length;
-    const step = len > 6 ? 430 : 540;
-    game.state = 'listening';
-    game.pos = 0;
-    gameBtn.disabled = true;
-    statusEl.textContent = 'Listen…';
-    game.seq.forEach((n, k) => {
-      later(() => pluck(n, { x: 0.5, vel: 0.75, glow: true, force: true }), 400 + k * step);
-    });
-    later(() => {
-      game.state = 'yours';
-      statusEl.textContent = 'Your turn — 0/' + len;
-    }, 400 + len * step);
-  }
-
-  function check(i) {
-    const len = game.seq.length;
-    if (i === game.seq[game.pos]) {
-      game.pos++;
-      if (game.pos < len) {
-        statusEl.textContent = game.pos + '/' + len;
-        return;
-      }
-      if (len > game.best) saveBest(len);
-      game.state = 'between';
-      statusEl.textContent = len < 5 ? 'Nice. One more.' : len < 8 ? 'Good ear.' : 'Okay, show-off.';
-      later(() => {
-        game.seq.push(randomString());
-        listen();
-      }, 1100);
-    } else {
-      game.state = 'idle';
-      gameBtn.disabled = false;
-      gameBtn.textContent = 'Try again';
-      statusEl.textContent = len > 3 ? 'Missed. You got ' + (len - 1) + ' in a row.' : 'Not that one.';
-      // Show which string it was.
-      pluck(game.seq[game.pos], { x: 0.5, vel: 0.3, glow: true, force: true });
+    let t = 300;
+    let c = 0;
+    while (t + pattern.length * song.step <= LENGTH - 1500) {
+      const shape = CHORDS[song.chords[c % song.chords.length]];
+      pattern.forEach((role, k) => {
+        const i = noteFor(shape, role);
+        if (i < 0) return;
+        const vel = k === 0 ? 0.8 : 0.5 + Math.random() * 0.15;
+        later(() => pluck(i, { x: 0.5, vel, glow: true, force: true, fret: shape[i] }), t);
+        t += song.step;
+      });
+      c++;
     }
+
+    // Close on a slow strum of the first chord.
+    const home = CHORDS[song.chords[0]];
+    home.forEach((fret, i) => {
+      if (fret < 0) return;
+      later(() => pluck(i, { x: 0.4, vel: 0.6, glow: true, force: true, fret }), t + i * 45);
+    });
+
+    later(() => {
+      playBtn.disabled = false;
+      playBtn.textContent = 'Play me something else';
+      statusEl.textContent = '';
+    }, t + 1600);
   }
 
-  gameBtn.addEventListener('click', () => {
+  playBtn.addEventListener('click', () => {
     wake();
-    startGame();
+    playSomething();
   });
 
   /* ---------- boot ---------- */
 
   readColors();
-  renderBest();
-  renderSoundBtn();
   resize();
   if (window.ResizeObserver) new ResizeObserver(resize).observe(canvas);
   else window.addEventListener('resize', resize);

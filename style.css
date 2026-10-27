@@ -40,28 +40,9 @@ body {
   min-height: 100vh;
   min-height: 100svh;
   display: grid;
-  grid-template-rows: auto 1fr auto;
+  grid-template-rows: auto 1fr;
   padding: var(--pad) var(--pad) 0;
 }
-
-/* sound toggle */
-.sound {
-  position: absolute;
-  top: var(--pad);
-  right: var(--pad);
-  font: inherit;
-  font-size: 13px;
-  letter-spacing: .04em;
-  color: var(--muted);
-  background: none;
-  border: 1px solid var(--rule);
-  border-radius: 999px;
-  padding: 4px 12px 5px;
-  cursor: pointer;
-  transition: color .2s, border-color .2s;
-}
-.sound:hover { color: var(--ink); border-color: var(--ink); }
-.sound[aria-pressed="true"] { color: var(--accent); border-color: var(--accent); }
 
 /* intro */
 .intro { max-width: 36rem; padding-top: clamp(24px, 6vh, 72px); }
@@ -78,6 +59,14 @@ h1 {
   max-width: 31rem;
 }
 .lede em { font-family: var(--serif); font-size: 1.08em; }
+.lede a {
+  color: inherit;
+  text-decoration: none;
+  border-bottom: 1px solid var(--rule);
+  transition: color .2s, border-color .2s;
+}
+.lede a:hover,
+.lede a:focus-visible { color: var(--accent); border-color: var(--accent); }
 
 .links { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--rule); }
 .links li { border-bottom: 1px solid var(--rule); }
@@ -139,7 +128,6 @@ canvas:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .game button:hover { color: var(--accent); }
 .game button:disabled { color: var(--muted); cursor: default; border-bottom-style: dotted; }
 .status { color: var(--ink); min-height: 1em; }
-.best:empty { display: none; }
 
 .stage {
   position: relative;
@@ -157,24 +145,8 @@ canvas {
   -webkit-tap-highlight-color: transparent;
 }
 
-.foot {
-  display: flex;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 1rem 0 calc(1rem + env(safe-area-inset-bottom));
-  border-top: 1px solid var(--rule);
-  font-size: .8rem;
-  color: var(--muted);
-}
-
 @media (max-width: 560px) {
   .links a { grid-template-columns: 1fr auto; gap: .1rem 1rem; }
   .links .what { grid-column: 1; grid-row: 2; }
   .links .arrow { grid-column: 2; grid-row: 1; }
-  .foot .keys { display: none; }
-  .sound { top: 16px; right: 16px; }
-}
-
-@media (pointer: coarse) {
-  .foot .keys { display: none; }
 }
