@@ -118,16 +118,52 @@ canvas:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 
 .game { display: flex; align-items: baseline; gap: .9rem; flex-wrap: wrap; }
 .game button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   font: inherit;
   color: var(--ink);
   background: none;
   border: 0;
   padding: 0;
-  border-bottom: 1px solid currentColor;
   cursor: pointer;
 }
+.game .label { border-bottom: 1px solid currentColor; }
 .game button:hover { color: var(--accent); }
-.game button:disabled { color: var(--muted); cursor: default; border-bottom-style: dotted; }
+.game button:disabled { cursor: default; }
+.game button:disabled .label { color: var(--muted); border-bottom-style: dotted; }
+
+/* the little busker above the button */
+.busker { display: block; width: 58px; height: 65px; margin-bottom: -2px; overflow: visible; }
+.busker .paper { fill: var(--bg); }
+.busker .strum,
+.busker .head,
+.busker .foot,
+.busker .note { transform-box: view-box; }
+.busker .strum { transform-origin: 24.6px 22.6px; animation: strum 1s ease-in-out infinite; }
+.busker .head { transform-origin: 30px 21px; animation: bob 2s ease-in-out infinite; }
+.busker .foot { transform-origin: 34px 51.5px; animation: tap 1s ease-in-out infinite; }
+.busker .note { opacity: 0; animation: float 4s ease-out infinite; }
+.busker .n2 { animation-delay: 2s; }
+.playing .busker .strum { animation-duration: .34s; }
+.playing .busker .head { animation-duration: .68s; }
+.playing .busker .foot { animation-duration: .68s; }
+.playing .busker .note { animation-duration: 1.6s; }
+.playing .busker .n2 { animation-delay: .8s; }
+
+@keyframes strum { 0%, 100% { transform: rotate(-7deg); } 50% { transform: rotate(9deg); } }
+@keyframes bob { 0%, 100% { transform: rotate(-2deg); } 50% { transform: rotate(3deg) translateY(.4px); } }
+@keyframes tap { 0%, 60%, 100% { transform: rotate(0); } 30% { transform: rotate(-8deg); } }
+@keyframes float {
+  0% { opacity: 0; transform: translate(0, 4px); }
+  20% { opacity: .9; }
+  100% { opacity: 0; transform: translate(5px, -9px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .busker * { animation: none !important; }
+  .busker .note { opacity: .7; }
+}
 
 .stage {
   position: relative;
