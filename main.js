@@ -133,8 +133,17 @@
   let gap = 0;
   let raf = 0;
   const colors = { ink: '#121212', accent: '#000', bg: '#f4f4f2' };
-  const strings = STRINGS.map(() => ({ amp: 0, t0: 0, px: 0.5, glow: 0, hold: 0, holdX: 0.5 }));
+  const strings = STRINGS.map(() => ({ amp: 0, t0: 0, px: 0, glow: 0, hold: 0, holdX: 0, fret: 0 }));
   let bend = null;
+
+  // The guitar laid flat: nut on the left, bridge on the right, body under the strings.
+  const g = { nut: 0, bridge: 0, mid: 0, bodyStart: 0, bodyLen: 0, hole: 0, holeR: 0, board: 0 };
+  const fretX = (n) => g.nut + (g.bridge - g.nut) * (1 - Math.pow(2, -n / 12));
+  // A string vibrates from the nut when open, from the fret wire when pressed.
+  const startX = (fret) => (fret > 0 ? fretX(fret) : g.nut);
+
+  // Fingers of the chord being held, faded in and out.
+  const fingers = { frets: null, t0: 0, on: false };
 
   function readColors() {
     const cs = getComputedStyle(document.documentElement);
@@ -151,32 +160,191 @@
     canvas.width = Math.round(W * dpr);
     canvas.height = Math.round(H * dpr);
     ctx2d.setTransform(dpr, 0, 0, dpr, 0, 0);
-    const top = H * 0.17;
-    gap = (H * 0.66) / (STRINGS.length - 1);
-    ys = STRINGS.map((_, i) => top + gap * i);
+    gap = Math.min((H * 0.56) / (STRINGS.length - 1), 58);
+    g.mid = H / 2;
+    // High e on top, low E at the bottom.
+    ys = STRINGS.map((_, i) => g.mid + gap * (i - (STRINGS.length - 1) / 2) * -1);
+    g.nut = Math.max(28, W * 0.04);
+    g.bridge = W * 0.82;
+    g.bodyStart = fretX(14) - gap * 0.4;
+    g.bodyLen = (g.bridge - g.bodyStart) * 1.55;
+    // A real top is about three quarters as wide as it is long; never narrower than the strings.
+    g.size = Math.min(Math.max(g.bodyLen, gap * 9), H * 1.6);
+    g.hole = g.bodyStart + g.bodyLen * 0.24;
+    g.holeR = Math.min(g.size * 0.11, gap * 2.2);
+    g.board = Math.min(fretX(20), g.hole - g.holeR * 1.02);
     draw(performance.now());
   }
 
-  // A string pulled at one point makes a triangle between the two ends.
-  function tri(x, at) {
-    const p = at * W;
-    return x < p ? x / p : (W - x) / (W - p);
+  function dot(x, y, r) {
+    ctx2d.beginPath();
+    ctx2d.arc(x, y, r, 0, Math.PI * 2);
+    ctx2d.fill();
   }
 
-  function strokeString(i, a, osc) {
-    const s = strings[i];
+  function bodyPath() {
+    const x0 = g.bodyStart, L = g.bodyLen, m = g.mid;
+    const S = g.size, neck = gap * 3.1, upper = S * 0.36, waist = S * 0.29, lower = S * 0.46;
+    const edge = [
+      [x0, m - neck], [x0 + L * 0.06, m - upper * 0.84], [x0 + L * 0.22, m - upper],
+      [x0 + L * 0.38, m - waist * 1.05], [x0 + L * 0.47, m - waist], [x0 + L * 0.58, m - lower * 0.93],
+      [x0 + L * 0.74, m - lower], [x0 + L * 0.92, m - lower * 0.72], [x0 + L, m],
+    ];
+    const pts = edge.concat(edge.slice(0, -1).reverse().map(([x, y]) => [x, 2 * m - y]));
     ctx2d.beginPath();
-    const steps = 64;
-    for (let k = 0; k <= steps; k++) {
-      const x = (k / steps) * W;
-      const y = ys[i] + s.hold * tri(x, s.holdX) + a * tri(x, s.px) * osc;
-      if (k) ctx2d.lineTo(x, y); else ctx2d.moveTo(x, y);
+    ctx2d.moveTo(pts[0][0], pts[0][1]);
+    for (let i = 0; i < pts.length - 1; i++) {
+      const p0 = pts[Math.max(0, i - 1)], p1 = pts[i], p2 = pts[i + 1], p3 = pts[Math.min(pts.length - 1, i + 2)];
+      ctx2d.bezierCurveTo(
+        p1[0] + (p2[0] - p0[0]) / 6, p1[1] + (p2[1] - p0[1]) / 6,
+        p2[0] - (p3[0] - p1[0]) / 6, p2[1] - (p3[1] - p1[1]) / 6,
+        p2[0], p2[1]
+      );
     }
+    ctx2d.closePath();
+  }
+
+  // The top of an acoustic guitar, drawn faintly behind the strings.
+  function drawGuitar() {
+    ctx2d.save();
+    ctx2d.strokeStyle = colors.ink;
+    ctx2d.fillStyle = colors.ink;
+
+    bodyPath();
+    ctx2d.globalAlpha = 0.035;
+    ctx2d.fill();
+    ctx2d.globalAlpha = 0.16;
+    ctx2d.lineWidth = 1.2;
+    ctx2d.stroke();
+
+    ctx2d.globalAlpha = 0.09;
+    dot(g.hole, g.mid, g.holeR);
+    ctx2d.globalAlpha = 0.14;
+    ctx2d.lineWidth = 0.8;
+    [1.12, 1.2, 1.32].forEach((k) => {
+      ctx2d.beginPath();
+      ctx2d.arc(g.hole, g.mid, g.holeR * k, 0, Math.PI * 2);
+      ctx2d.stroke();
+    });
+    ctx2d.setLineDash([1, 3]);
+    ctx2d.beginPath();
+    ctx2d.arc(g.hole, g.mid, g.holeR * 1.26, 0, Math.PI * 2);
+    ctx2d.stroke();
+    ctx2d.setLineDash([]);
+
+    const fbTop = Math.min(...ys) - gap * 0.55;
+    const fbBot = Math.max(...ys) + gap * 0.55;
+    ctx2d.globalAlpha = 0.06;
+    ctx2d.fillRect(g.nut, fbTop, g.board - g.nut, fbBot - fbTop);
+
+    ctx2d.globalAlpha = 0.24;
+    ctx2d.lineWidth = 1.2;
+    ctx2d.beginPath();
+    for (let n = 1; fretX(n) < g.board - 2; n++) {
+      ctx2d.moveTo(fretX(n), fbTop);
+      ctx2d.lineTo(fretX(n), fbBot);
+    }
+    ctx2d.stroke();
+
+    ctx2d.globalAlpha = 0.4;
+    ctx2d.fillRect(g.nut - 3, fbTop, 3, fbBot - fbTop);
+
+    ctx2d.globalAlpha = 0.12;
+    const inlay = Math.max(1.5, Math.min(gap * 0.15, (fretX(12) - fretX(11)) * 0.3));
+    [3, 5, 7, 9, 15, 17].forEach((n) => {
+      if (fretX(n) < g.board) dot((fretX(n - 1) + fretX(n)) / 2, g.mid, inlay);
+    });
+    if (fretX(12) < g.board) {
+      const x = (fretX(11) + fretX(12)) / 2;
+      dot(x, g.mid - gap * 1.5, inlay);
+      dot(x, g.mid + gap * 1.5, inlay);
+    }
+
+    ctx2d.globalAlpha = 0.08;
+    ctx2d.beginPath();
+    const bw = Math.min(gap * 2.6, g.bodyLen * 0.12);
+    if (ctx2d.roundRect) ctx2d.roundRect(g.bridge - bw * 0.2, g.mid - gap * 3.3, bw, gap * 6.6, bw * 0.2);
+    else ctx2d.rect(g.bridge - bw * 0.2, g.mid - gap * 3.3, bw, gap * 6.6);
+    ctx2d.fill();
+    ctx2d.globalAlpha = 0.3;
+    ctx2d.lineWidth = 2;
+    ctx2d.beginPath();
+    ctx2d.moveTo(g.bridge, g.mid - gap * 2.8);
+    ctx2d.lineTo(g.bridge, g.mid + gap * 2.8);
+    ctx2d.stroke();
+    ctx2d.globalAlpha = 0.25;
+    ys.forEach((y) => dot(g.bridge + bw * 0.5, y, Math.max(1.2, Math.min(gap * 0.12, bw * 0.08))));
+    ctx2d.restore();
+  }
+
+  function drawFingers(now) {
+    if (!fingers.frets) return false;
+    const fade = fingers.on
+      ? Math.min(1, (now - fingers.t0) / 120)
+      : 1 - Math.min(1, (now - fingers.t0) / 250);
+    if (fade <= 0) {
+      if (!fingers.on) fingers.frets = null;
+      return false;
+    }
+    ctx2d.save();
+    ctx2d.fillStyle = colors.ink;
+    ctx2d.strokeStyle = colors.ink;
+    ctx2d.lineWidth = 1;
+    const mark = Math.max(2.5, gap * 0.14);
+    const side = g.nut - Math.max(9, mark + 6);
+    fingers.frets.forEach((f, i) => {
+      const y = ys[i];
+      if (f > 0) {
+        const a = fretX(f - 1), b = fretX(f);
+        ctx2d.globalAlpha = 0.2 * fade;
+        dot(a + (b - a) * 0.6, y, Math.min(gap * 0.3, (b - a) * 0.38));
+        return;
+      }
+      ctx2d.globalAlpha = 0.25 * fade;
+      ctx2d.beginPath();
+      if (f === 0) ctx2d.arc(side, y, mark, 0, Math.PI * 2);
+      else {
+        ctx2d.moveTo(side - mark, y - mark); ctx2d.lineTo(side + mark, y + mark);
+        ctx2d.moveTo(side + mark, y - mark); ctx2d.lineTo(side - mark, y + mark);
+      }
+      ctx2d.stroke();
+    });
+    ctx2d.restore();
+    return !fingers.on || fade < 1;
+  }
+
+  function showFingers(frets) {
+    if (frets) fingers.frets = frets;
+    fingers.on = !!frets;
+    fingers.t0 = performance.now();
+    kick();
+  }
+
+  // A string pulled at one point makes a triangle between its two ends.
+  function tri(x, at, a, b) {
+    return x < at ? (x - a) / (at - a) : (b - x) / (b - at);
+  }
+
+  function strokeString(i, amp, osc) {
+    const s = strings[i];
+    const a = startX(s.fret), b = g.bridge, y0 = ys[i];
+    const px = clamp(s.px, a + 4, b - 4);
+    const hx = clamp(s.holdX, a + 4, b - 4);
+    ctx2d.beginPath();
+    ctx2d.moveTo(0, y0);
+    ctx2d.lineTo(a, y0);
+    const steps = 64;
+    for (let k = 1; k <= steps; k++) {
+      const x = a + ((b - a) * k) / steps;
+      ctx2d.lineTo(x, y0 + s.hold * tri(x, hx, a, b) + amp * tri(x, px, a, b) * osc);
+    }
+    ctx2d.lineTo(b + Math.min(gap * 2.6, g.bodyLen * 0.12) * 0.5, y0);
   }
 
   function draw(now) {
     ctx2d.clearRect(0, 0, W, H);
-    let busy = false;
+    drawGuitar();
+    let busy = drawFingers(now);
     for (let i = 0; i < STRINGS.length; i++) {
       const s = strings[i];
       const t = (now - s.t0) / 1000;
@@ -231,19 +399,30 @@
   /* ---------- plucking ---------- */
 
   const lastPluck = STRINGS.map(() => 0);
+  let held = null; // the chord shape held down with the A–G keys
 
   function pluck(i, opts) {
     const now = performance.now();
     if (now - lastPluck[i] < 45 && !opts.force) return;
     lastPluck[i] = now;
     const s = strings[i];
-    const vel = clamp(opts.vel == null ? 0.7 : opts.vel, 0.1, 1);
-    s.amp = (5 + vel * 11) * (reduceMotion.matches ? 0.3 : 1);
+    const fret = opts.fret != null ? opts.fret : held ? held[i] : 0;
     s.t0 = now;
-    s.px = clamp(opts.x == null ? 0.5 : opts.x, 0.08, 0.92);
+    if (fret < 0) {
+      // A muted string in the shape just thuds.
+      s.amp = 1.5;
+      s.fret = 0;
+      kick();
+      return;
+    }
+    const vel = clamp(opts.vel == null ? 0.7 : opts.vel, 0.1, 1);
+    s.fret = fret;
+    s.amp = (5 + vel * 11) * (reduceMotion.matches ? 0.3 : 1);
+    s.px = opts.x == null ? g.hole : opts.x * W;
     s.glow = opts.glow ? 1 : 0;
     kick();
-    ring(i, vel, s.px, opts.delay, opts.fret);
+    const a = startX(fret);
+    ring(i, vel, clamp((s.px - a) / (g.bridge - a), 0.08, 0.92), opts.delay, fret);
     if (opts.touch) buzz();
   }
 
@@ -279,7 +458,7 @@
 
   function startBend() {
     bend.active = true;
-    strings[bend.i].holdX = clamp(bend.x / W, 0.08, 0.92);
+    strings[bend.i].holdX = bend.x;
     kick();
   }
 
@@ -287,7 +466,7 @@
     const reach = gap * 0.9;
     const dy = clamp(p.y - bend.y, -reach, reach);
     strings[bend.i].hold = dy;
-    strings[bend.i].holdX = clamp(p.x / W, 0.04, 0.96);
+    strings[bend.i].holdX = p.x;
     bendPitch(bend.i, (MAX_BEND * Math.abs(dy)) / reach, 0.012);
     kick();
   }
@@ -336,12 +515,14 @@
       ys.forEach((sy, i) => {
         if ((last.y - sy) * (p.y - sy) < 0) crossed.push(i);
       });
-      if (dy < 0) crossed.reverse();
+      // Strike them in the order the pick meets them.
+      crossed.sort((i, j) => (dy > 0 ? ys[i] - ys[j] : ys[j] - ys[i]));
       crossed.forEach((i, k) => {
         const f = (ys[i] - last.y) / dy;
         const x = (last.x + (p.x - last.x) * f) / W;
         pluck(i, { x, vel, delay: k * 0.012, touch: e.pointerType === 'touch' });
-      });    }
+      });
+    }
     last = p;
   });
 
@@ -357,14 +538,45 @@
     if (e.pointerType !== 'mouse') forget();
   });
 
+  // Hold A–G to fret that chord; strum while holding to hear it. Low E to high e.
+  const HAND = {
+    a: [-1, 0, 2, 2, 2, 0],
+    b: [-1, 2, 4, 4, 4, 2],
+    c: [-1, 3, 2, 0, 1, 0],
+    d: [-1, -1, 0, 2, 3, 2],
+    e: [0, 2, 2, 1, 0, 0],
+    f: [1, 3, 3, 2, 1, 1],
+    g: [3, 2, 0, 0, 0, 3],
+  };
+  let heldKey = '';
+
+  function release() {
+    if (!held) return;
+    held = null;
+    heldKey = '';
+    showFingers(null);
+  }
+
   window.addEventListener('keydown', (e) => {
     if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+    const key = e.key.toLowerCase();
+    if (HAND[key]) {
+      held = HAND[key];
+      heldKey = key;
+      showFingers(held);
+      return;
+    }
+    // Keys 1–6 are strings 1–6: 1 is the thin high e on top.
     const n = Number(e.key);
     if (n >= 1 && n <= 6) {
       wake();
-      pluck(n - 1, { x: 0.5, vel: 0.7 });
+      pluck(STRINGS.length - n, { vel: 0.7 });
     }
   });
+  window.addEventListener('keyup', (e) => {
+    if (e.key.toLowerCase() === heldKey) release();
+  });
+  window.addEventListener('blur', release);
 
   /* ---------- play me something ---------- */
 
@@ -456,11 +668,12 @@
     let c = 0;
     while (t + pattern.length * song.step <= LENGTH - 1500) {
       const shape = CHORDS[song.chords[c % song.chords.length]];
+      later(() => showFingers(shape), t);
       pattern.forEach((role, k) => {
         const i = noteFor(shape, role);
         if (i < 0) return;
         const vel = k === 0 ? 0.8 : 0.5 + Math.random() * 0.15;
-        later(() => pluck(i, { x: 0.3, vel, glow: true, force: true, fret: shape[i] }), t);
+        later(() => pluck(i, { vel, glow: true, force: true, fret: shape[i] }), t);
         t += song.step;
       });
       c++;
@@ -468,14 +681,16 @@
 
     // Close on a slow strum of the first chord.
     const home = CHORDS[song.chords[0]];
+    later(() => showFingers(home), t);
     home.forEach((fret, i) => {
       if (fret < 0) return;
-      later(() => pluck(i, { x: 0.4, vel: 0.6, glow: true, force: true, fret }), t + i * 45);
+      later(() => pluck(i, { vel: 0.6, glow: true, force: true, fret }), t + i * 45);
     });
 
     later(() => {
       playBtn.disabled = false;
       playBtn.classList.remove('playing');
+      showFingers(held);
       playLabel.textContent = 'Play me something else';
     }, t + 1600);
   }
