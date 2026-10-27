@@ -89,7 +89,8 @@
     const src = audio.createBufferSource();
     const variants = bank[i];
     src.buffer = variants[(Math.random() * variants.length) | 0];
-    src.playbackRate.value = Math.pow(2, (fret || 0) / 12) * (1 + (Math.random() - 0.5) * 0.002);
+    const rate = Math.pow(2, (fret || 0) / 12) * (1 + (Math.random() - 0.5) * 0.002);
+    src.playbackRate.value = rate;
     const gain = audio.createGain();
     gain.gain.value = 0.25 + vel * 0.6;
     src.connect(gain);
@@ -102,9 +103,15 @@
       gain.connect(master);
     }
     src.start(t);
-    const voice = { src, gain };
+    const voice = { src, gain, rate };
     voices[i] = voice;
     src.onended = () => { if (voices[i] === voice) voices[i] = null; };
+  }
+
+  function bendPitch(i, semis, glide) {
+    const v = voices[i];
+    if (!v || !audio) return;
+    v.src.playbackRate.setTargetAtTime(v.rate * Math.pow(2, semis / 12), audio.currentTime, glide);
   }
 
   /* ---------- drawing ---------- */
@@ -115,7 +122,8 @@
   let gap = 0;
   let raf = 0;
   const colors = { ink: '#1d1b18', accent: '#c2410c', bg: '#f2ede3' };
-  const strings = STRINGS.map(() => ({ amp: 0, t0: 0, px: 0.5, glow: 0 }));
+  const strings = STRINGS.map(() => ({ amp: 0, t0: 0, px: 0.5, glow: 0, hold: 0, holdX: 0.5 }));
+  let bend = null;
 
   function readColors() {
     const cs = getComputedStyle(document.documentElement);
@@ -138,15 +146,19 @@
     draw(performance.now());
   }
 
-  function strokeString(i, a, px, osc) {
-    const y0 = ys[i];
-    const pxW = px * W;
+  // A string pulled at one point makes a triangle between the two ends.
+  function tri(x, at) {
+    const p = at * W;
+    return x < p ? x / p : (W - x) / (W - p);
+  }
+
+  function strokeString(i, a, osc) {
+    const s = strings[i];
     ctx2d.beginPath();
     const steps = 64;
     for (let k = 0; k <= steps; k++) {
       const x = (k / steps) * W;
-      const shape = x < pxW ? x / pxW : (W - x) / (W - pxW);
-      const y = y0 + a * shape * osc;
+      const y = ys[i] + s.hold * tri(x, s.holdX) + a * tri(x, s.px) * osc;
       if (k) ctx2d.lineTo(x, y); else ctx2d.moveTo(x, y);
     }
   }
@@ -163,7 +175,14 @@
       if (glow > 0) busy = true;
       const osc = Math.sin(t * Math.PI * 2 * (14 + i * 2.2));
 
-      strokeString(i, a, s.px, osc);
+      // Let go of a bend and the string snaps back.
+      if (bend && bend.active && bend.i === i) busy = true;
+      else if (s.hold) {
+        s.hold *= 0.6;
+        if (Math.abs(s.hold) < 0.3) s.hold = 0; else busy = true;
+      }
+
+      strokeString(i, a, osc);
       ctx2d.lineWidth = STRINGS[i].width;
       ctx2d.lineCap = 'round';
       ctx2d.globalAlpha = 0.88;
@@ -233,19 +252,60 @@
     return { x: e.clientX - r.left, y: e.clientY - r.top, t: e.timeStamp };
   }
 
+  /* ---------- bending: press on a string and pull ---------- */
+
+  const MAX_BEND = 2; // semitones — a whole-step bend
+
+  function startBend() {
+    bend.active = true;
+    strings[bend.i].holdX = clamp(bend.x / W, 0.08, 0.92);
+    kick();
+  }
+
+  function moveBend(p) {
+    const reach = gap * 0.9;
+    const dy = clamp(p.y - bend.y, -reach, reach);
+    strings[bend.i].hold = dy;
+    bendPitch(bend.i, (MAX_BEND * Math.abs(dy)) / reach, 0.012);
+    kick();
+  }
+
+  function endBend() {
+    if (!bend) return;
+    clearTimeout(bend.timer);
+    if (bend.active) {
+      bendPitch(bend.i, 0, 0.04);
+      kick();
+    }
+    bend = null;
+  }
+
   canvas.addEventListener('pointerdown', (e) => {
     wake();
+    endBend();
     const p = point(e);
     last = p;
     const i = nearest(p.y);
     if (i >= 0) pluck(i, { x: p.x / W, vel: 0.8 });
-    if (e.pointerType !== 'mouse' && canvas.setPointerCapture) {
-      canvas.setPointerCapture(e.pointerId);
+    if (i >= 0 && Math.abs(ys[i] - p.y) <= gap * 0.35) {
+      bend = { i, x: p.x, y: p.y, id: e.pointerId, active: false, timer: 0 };
+      // On touch a short hold starts the bend, so a quick swipe still strums.
+      if (e.pointerType === 'mouse') startBend();
+      else bend.timer = setTimeout(startBend, 180);
     }
+    try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* pointer already gone */ }
   });
 
   canvas.addEventListener('pointermove', (e) => {
     const p = point(e);
+    if (bend && bend.id === e.pointerId) {
+      if (bend.active) {
+        moveBend(p);
+        last = p;
+        return;
+      }
+      if (Math.hypot(p.x - bend.x, p.y - bend.y) > 6) endBend();
+    }
     if (last) {
       const dy = p.y - last.y;
       const dt = Math.max(1, p.t - last.t);
@@ -266,8 +326,12 @@
 
   const forget = () => { last = null; };
   canvas.addEventListener('pointerleave', forget);
-  canvas.addEventListener('pointercancel', forget);
-  canvas.addEventListener('pointerup', (e) => { if (e.pointerType !== 'mouse') forget(); });
+  canvas.addEventListener('pointercancel', () => { endBend(); forget(); });
+  canvas.addEventListener('lostpointercapture', endBend);
+  canvas.addEventListener('pointerup', (e) => {
+    endBend();
+    if (e.pointerType !== 'mouse') forget();
+  });
 
   window.addEventListener('keydown', (e) => {
     if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
