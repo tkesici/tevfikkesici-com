@@ -136,36 +136,23 @@ canvas:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .game button:hover { color: var(--accent); }
 .game button:disabled .label { color: var(--muted); border-bottom-style: dotted; }
 
-/* the little busker above the button */
-.busker { display: block; width: 58px; height: 65px; margin-bottom: -2px; overflow: visible; }
-.busker .paper { fill: var(--bg); }
-.busker .strum,
-.busker .head,
-.busker .foot,
-.busker .note { transform-box: view-box; }
-.busker .strum { transform-origin: 24.6px 22.6px; animation: strum 1s ease-in-out infinite; }
-.busker .head { transform-origin: 30px 21px; animation: bob 2s ease-in-out infinite; }
-.busker .foot { transform-origin: 19px 55.8px; animation: tap 1s ease-in-out infinite; }
-.busker .note { opacity: 0; animation: float 4s ease-out infinite; }
-.busker .n2 { animation-delay: 2s; }
-.playing .busker .strum { animation-duration: .34s; }
-.playing .busker .head { animation-duration: .68s; }
-.playing .busker .foot { animation-duration: .68s; }
-.playing .busker .note { animation-duration: 1.6s; }
-.playing .busker .n2 { animation-delay: .8s; }
+/* a few notes drift up, softly, to hint at the button */
+.ditty { display: block; width: 40px; height: 30px; margin-bottom: 2px; overflow: visible; }
+.ditty .note { opacity: 0; transform-box: view-box; animation: drift 7.5s ease-out infinite; }
+.ditty .n2 { animation-delay: 2.5s; }
+.ditty .n3 { animation-delay: 5s; }
+.playing .ditty .note { animation-duration: 3s; }
+.playing .ditty .n2 { animation-delay: 1s; }
+.playing .ditty .n3 { animation-delay: 2s; }
 
-@keyframes strum { 0%, 100% { transform: rotate(-7deg); } 50% { transform: rotate(9deg); } }
-@keyframes bob { 0%, 100% { transform: rotate(-2deg); } 50% { transform: rotate(3deg) translateY(.4px); } }
-@keyframes tap { 0%, 60%, 100% { transform: rotate(0); } 30% { transform: rotate(-8deg); } }
-@keyframes float {
-  0% { opacity: 0; transform: translate(0, 4px); }
-  20% { opacity: .9; }
-  100% { opacity: 0; transform: translate(5px, -9px); }
+@keyframes drift {
+  0% { opacity: 0; transform: translate(0, 4px) scale(.85); }
+  25% { opacity: .55; }
+  100% { opacity: 0; transform: translate(3px, -16px) scale(1); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .busker * { animation: none !important; }
-  .busker .note { opacity: .7; }
+  .ditty .note { animation: none; opacity: .35; }
 }
 
 .stage {
