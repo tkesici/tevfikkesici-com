@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  // Standard tuning, low E on top — the way you see it when you hold the guitar.
+  // Standard tuning, listed low E to high e. On screen the thick low E sits at the bottom.
   const STRINGS = [
     { freq: 82.41, width: 3.0, wound: true },
     { freq: 110.0, width: 2.5, wound: true },
@@ -158,7 +158,7 @@
     ctx2d.setTransform(dpr, 0, 0, dpr, 0, 0);
     const top = H * 0.17;
     gap = (H * 0.66) / (STRINGS.length - 1);
-    ys = STRINGS.map((_, i) => top + gap * i);
+    ys = STRINGS.map((_, i) => top + gap * (STRINGS.length - 1 - i));
     draw(performance.now());
   }
 
@@ -383,7 +383,8 @@
       ys.forEach((sy, i) => {
         if ((last.y - sy) * (p.y - sy) < 0) crossed.push(i);
       });
-      if (dy < 0) crossed.reverse();
+      // Strike them in the order the pick meets them.
+      crossed.sort((i, j) => (dy > 0 ? ys[i] - ys[j] : ys[j] - ys[i]));
       crossed.forEach((i, k) => {
         const f = (ys[i] - last.y) / dy;
         const x = (last.x + (p.x - last.x) * f) / W;
@@ -453,10 +454,11 @@
       showFingers(held);
       return;
     }
+    // Keys 1–6 are strings 1–6: 1 is the thin high e on top.
     const n = Number(e.key);
     if (n >= 1 && n <= 6) {
       wake();
-      pluck(n - 1, { x: 0.5, vel: 0.7 });
+      pluck(STRINGS.length - n, { x: 0.5, vel: 0.7 });
     }
   });
   window.addEventListener('keyup', (e) => {
