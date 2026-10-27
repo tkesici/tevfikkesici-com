@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'; upgrade-insecure-requests; require-trusted-types-for 'script'; trusted-types 'none'">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <title>Tevfik Kesici</title>
+  <meta name="description" content="Tevfik Kesici — software developer and guitar player. Maker of 7uner.">
+  <meta name="color-scheme" content="light dark">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+  <script src="main.js" defer></script>
+</head>
+<body>
+  <main class="page">
+    <button class="sound" id="sound" type="button" aria-pressed="false">sound off</button>
+
+    <section class="intro">
+      <h1>Tevfik Kesici</h1>
+      <p class="lede">
+        I'm a software developer. Most of my days go into building things for the web,
+        most of my evenings go into a guitar. <em>7uner</em> is where the two meet.
+      </p>
+
+      <ul class="links">
+        <li>
+          <a href="https://7uner.com/" target="_blank" rel="noopener noreferrer">
+            <span class="name">7uner</span>
+            <span class="what">Tuner, practice room and tab player. Runs in your browser.</span>
+            <span class="arrow" aria-hidden="true">&#8599;</span>
+          </a>
+        </li>
+        <li>
+          <a href="https://www.linkedin.com/in/tevfik-kesici-541a07127/" target="_blank" rel="noopener noreferrer">
+            <span class="name">LinkedIn</span>
+            <span class="what">The work side of things.</span>
+            <span class="arrow" aria-hidden="true">&#8599;</span>
+          </a>
+        </li>
+      </ul>
+    </section>
+
+    <section class="play" aria-labelledby="play-title">
+      <div class="play-head">
+        <p class="hint" id="play-title">
+          <span class="fine">Run your cursor across the strings.</span>
+          <span class="coarse">Swipe across the strings.</span>
+        </p>
+        <div class="game">
+          <button id="game" type="button">Play me something</button>
+          <span id="status" class="status" aria-live="polite"></span>
+          <span id="best" class="best"></span>
+        </div>
+      </div>
+      <div class="stage">
+        <canvas id="strings" role="img"
+          aria-label="Six guitar strings. Strum them with the mouse or by touch, or press keys 1 to 6."></canvas>
+      </div>
+    </section>
+
+    <footer class="foot">
+      <span>&copy; 2026 Tevfik Kesici</span>
+      <span class="keys">keys 1&ndash;6 work too</span>
+    </footer>
+  </main>
+</body>
+</html>
