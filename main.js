@@ -59,6 +59,13 @@
 
   // Browsers only allow audio after a click, tap or key press.
   function wake() {
+    // iOS files Web Audio as "ambient" sound, which the silent switch mutes.
+    // Calling it playback lets the strings ring with the phone on silent (Safari 16.4+).
+    try {
+      if (navigator.audioSession && navigator.audioSession.type !== 'playback') {
+        navigator.audioSession.type = 'playback';
+      }
+    } catch (e) { /* older browsers: keep the default */ }
     if (!audio) {
       const AC = window.AudioContext || window.webkitAudioContext;
       if (!AC) return;
