@@ -139,7 +139,7 @@
   let ys = [];
   let gap = 0;
   let raf = 0;
-  const colors = { ink: '#121212', accent: '#000', bg: '#f4f4f2' };
+  const colors = {};
   const strings = STRINGS.map(() => ({ amp: 0, t0: 0, px: 0.5, glow: 0, hold: 0, holdX: 0.5, fret: 0 }));
   let bend = null;
 
@@ -148,14 +148,23 @@
   // Fingers of the chord being held, faded in and out.
   const fingers = { frets: null, t0: 0, on: false };
 
+  // The same palette as style.css, used whenever the stylesheet hasn't been applied yet
+  // (Safari can run the script before that when it restores a page).
+  const PALETTE = {
+    light: { ink: '#1d1b18', accent: '#000', bg: '#f2ede3' },
+    dark: { ink: '#ebe4d6', accent: '#fff', bg: '#151411' },
+  };
+
   function readColors() {
     const cs = getComputedStyle(document.documentElement);
-    colors.ink = cs.getPropertyValue('--ink').trim() || colors.ink;
-    colors.accent = cs.getPropertyValue('--accent').trim() || colors.accent;
-    colors.bg = cs.getPropertyValue('--bg').trim() || colors.bg;
+    const fallback = PALETTE[darkScheme.matches ? 'dark' : 'light'];
+    colors.ink = cs.getPropertyValue('--ink').trim() || fallback.ink;
+    colors.accent = cs.getPropertyValue('--accent').trim() || fallback.accent;
+    colors.bg = cs.getPropertyValue('--bg').trim() || fallback.bg;
   }
 
   function resize() {
+    readColors();
     const r = canvas.getBoundingClientRect();
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     W = r.width;
@@ -595,12 +604,15 @@
 
   /* ---------- boot ---------- */
 
-  readColors();
   resize();
   if (window.ResizeObserver) new ResizeObserver(resize).observe(canvas);
   else window.addEventListener('resize', resize);
-  const onScheme = () => { readColors(); draw(performance.now()); };
-  if (darkScheme.addEventListener) darkScheme.addEventListener('change', onScheme);
+  // Read the colors again once the page has fully loaded, comes back from Safari's
+  // page cache, or switches between light and dark.
+  const recolor = () => { readColors(); draw(performance.now()); };
+  window.addEventListener('load', recolor);
+  window.addEventListener('pageshow', recolor);
+  if (darkScheme.addEventListener) darkScheme.addEventListener('change', recolor);
 
   // A quiet hello so people notice the strings are alive.
   setTimeout(() => {
